@@ -1,0 +1,42 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(conda create:*)",
+      "Bash(module list)",
+      "Bash(ls:*)",
+      "Bash(wget:*)",
+      "Bash(bash:*)",
+      "Bash(curl:*)",
+      "Bash(module avail:*)",
+      "Bash(rm:*)",
+      "Bash(~/miniconda3/bin/conda init bash)",
+      "Bash(source:*)",
+      "Bash(conda:*)",
+      "Bash(snakemake:*)",
+      "Bash(mv:*)",
+      "Bash(echo $SGE_CWD_PATH)",
+      "Bash(qstat:*)",
+      "Bash(chmod:*)",
+      "Bash(qsub:*)",
+      "Bash(qconf:*)",
+      "Bash(grep:*)",
+      "Bash(qdel:*)",
+      "Bash(mkdir:*)",
+      "Bash(find:*)",
+      "Bash(echo $USER)",
+      "Bash(cat:*)",
+      "Bash(~/miniconda3/bin/conda env remove -n sceptre_power_sim -y)",
+      "Bash(echo $CONDA_PREFIX)",
+      "WebFetch(domain:research-it.wharton.upenn.edu)",
+      "Bash(/dev/null)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(git remote set-url:*)",
+      "Bash(git remote add:*)",
+      "Bash(qacct:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ],
+    "deny": []
+  }
+}

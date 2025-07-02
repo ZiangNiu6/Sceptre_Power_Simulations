@@ -1,0 +1,4 @@
+.snakemake/
+*.o*
+results/test_data/simulated_*.rds
+results/test_data/power_analysis_split/*.tsv
