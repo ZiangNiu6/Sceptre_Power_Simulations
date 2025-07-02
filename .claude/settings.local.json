@@ -35,7 +35,8 @@
       "Bash(git remote add:*)",
       "Bash(qacct:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ],
     "deny": []
   }
