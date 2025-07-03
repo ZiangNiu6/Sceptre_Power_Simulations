@@ -1,12 +1,18 @@
-cluster: "qsub -j y -cwd -V -P stat_bhaswar_team -l m_mem_free={resources.mem_free} -l h_rt={resources.time} -pe openmp {threads} -N {rule}"
+cluster: |
+  qsub -terse -j y -cwd -V -P stat_bhaswar_team \
+       -l m_mem_free={resources.mem_free} \
+       -l h_rt={resources.time} \
+       -pe openmp {threads} \
+       -N {rule}
 cluster-cancel: "qdel {jobid}"
+cluster-status: "/home/mnt/weka/ekatsevi/team/ziangniu/code/Sceptre_Power_Simulations/cluster_status_uge.sh {jobid}"
 jobs: 20
-retries: 1
+retries: 4
+restart-times: 2
 use-conda: true
 conda-frontend: conda
 latency-wait: 30
 notemp: true
 default-resources:
   - mem_free="32G"
-  - time="1:00:00"
   - threads=1

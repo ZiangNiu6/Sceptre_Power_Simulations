@@ -60,7 +60,7 @@ rule sceptre_power_analysis:
     "../envs/sceptre_power_simulations.yml"
   resources:
     mem = "8G",
-    time = "1:00:00"
+    time = lambda wc, attempt: f"{3600 * 2**(attempt-1) // 3600}:{(3600 * 2**(attempt-1) % 3600) // 60:02d}:{(3600 * 2**(attempt-1) % 3600) % 60:02d}"
   script:
     "../scripts/sceptre_power_analysis.R"
 
