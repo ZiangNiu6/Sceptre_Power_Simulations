@@ -9,14 +9,22 @@ if qstat -j "$jid" &>/dev/null; then
     exit 0
 fi
 
-# Otherwise it has finished → use qacct (needs some seconds after end)
-exit_status=$(qacct -j "$jid" 2>/dev/null | awk '/exit_status/ {print $2}')
+# Job not in qstat - try qacct with retries to handle timing gap
+for i in {1..10}; do
+    exit_status=$(qacct -j "$jid" 2>/dev/null | awk '/^exit_status/ {print $NF}')
+    
+    if [[ -n "$exit_status" ]]; then
+        if [[ "$exit_status" -eq 0 ]]; then
+            echo "success"
+        else
+            echo "failed"
+        fi
+        exit 0
+    fi
+    
+    # Wait 3 seconds before retry
+    sleep 3
+done
 
-if [[ -z "$exit_status" ]]; then
-    # accounting record not written yet → assume still running
-    echo "running"
-elif [[ "$exit_status" -eq 0 ]]; then
-    echo "success"
-else
-    echo "failed"
-fi
+# If still no accounting record after 30 seconds, assume failed
+echo "failed"

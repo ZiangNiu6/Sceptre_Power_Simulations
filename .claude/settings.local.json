@@ -36,7 +36,9 @@
       "Bash(qacct:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(./cluster_status_uge.sh:*)",
+      "Bash(git checkout:*)"
     ],
     "deny": []
   }
