@@ -8,7 +8,6 @@ cluster-cancel: "qdel {jobid}"
 cluster-status: "/home/mnt/weka/ekatsevi/team/ziangniu/code/Sceptre_Power_Simulations/cluster_status_uge.sh {jobid}"
 jobs: 20
 retries: 4
-restart-times: 2
 use-conda: true
 conda-frontend: conda
 latency-wait: 30
