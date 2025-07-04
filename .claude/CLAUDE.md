@@ -55,3 +55,7 @@ This ensures the remote repo maintains the same state as the local repo with all
 ## Cache Management Protocol
 
 Going forward, I'll ask before running `--delete-all-output` to preserve cached results when possible.
+
+## Job Submission Protocol
+
+**IMPORTANT**: Before resubmitting the job, please unlock first using `snakemake --unlock`.

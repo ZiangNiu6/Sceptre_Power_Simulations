@@ -16,7 +16,7 @@ rule split_target_response_pairs:
     "../envs/sceptre_power_simulations.yml"
   resources:
     mem = "16G",
-    time = "1:00:00"
+    time = "160:00:00"
   script:
     "../scripts/split_target_response_pairs.R"
     
@@ -36,7 +36,7 @@ rule create_simulated_sceptre_object:
     "../envs/sceptre_power_simulations.yml"
   resources:
     mem = "32G",
-    time = "2:00:00"
+    time = "160:00:00"
   script:
     "../scripts/create_simulated_sceptre_object.R"
 
@@ -60,7 +60,7 @@ rule sceptre_power_analysis:
     "../envs/sceptre_power_simulations.yml"
   resources:
     mem = "8G",
-    time = lambda wc, attempt: f"{3600 * 2**(attempt-1) // 3600}:{(3600 * 2**(attempt-1) % 3600) // 60:02d}:{(3600 * 2**(attempt-1) % 3600) % 60:02d}"
+    time = "160:00:00"
   script:
     "../scripts/sceptre_power_analysis.R"
 
@@ -76,7 +76,7 @@ rule combine_sceptre_power_analysis:
    "../envs/sceptre_power_simulations.yml"
  resources:
    mem = "32G",
-   time = "2:00:00"
+   time = "160:00:00"
  script:
    "../scripts/combine_sceptre_power_analysis.R"
    
@@ -96,7 +96,7 @@ rule compute_power_from_simulations:
     "../envs/sceptre_power_simulations.yml"
   resources:
     mem = "24G",
-    time = "1:00:00"
+    time = "160:00:00"
   script:
     "../scripts/compute_power_from_simulations.R"
     

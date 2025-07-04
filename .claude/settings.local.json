@@ -38,7 +38,9 @@
       "Bash(git commit:*)",
       "Bash(git push:*)",
       "Bash(./cluster_status_uge.sh:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(export:*)",
+      "Bash(awk:*)"
     ],
     "deny": []
   }

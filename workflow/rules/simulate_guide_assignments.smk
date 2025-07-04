@@ -16,7 +16,7 @@ rule simulate_guide_assignments:
     "../envs/sceptre_power_simulations.yml"
   resources:
     mem = "64G",
-    time = "2:00:00"
+    time = "160:00:00"
   script:
     "../scripts/simulate_guide_assignments.R"
     
@@ -33,6 +33,6 @@ rule fit_dispersions:
     "../envs/analyze_crispr_screen.yml"
   resources:
     mem = "32G",
-    time = "4:00:00"
+    time = "160:00:00"
   script:
     "../scripts/fit_negbinom_distr.R"
