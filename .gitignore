@@ -18,5 +18,6 @@ simulation/num_trt_*/results/test_data/power_analysis_output.tsv
 simulation/num_trt_*/results/test_data/power_analysis_plots_files/
 simulation/num_trt_*/results/test_data/logs/
 
-# Keep timing files
+# Keep timing files and updated run scripts
 !simulation/num_trt_*/simulation_timing.log
+!simulation/num_trt_*/run_snakemake.sh
