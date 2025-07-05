@@ -1,0 +1,12 @@
+cluster: "qsub -j y -cwd -V -P stat_bhaswar_team -l m_mem_free={resources.mem_free} -l h_rt={resources.time} -pe openmp {threads} -N {rule}_effect_0_40"
+cluster-cancel: "qdel {jobid}"
+jobs: 20
+retries: 1
+use-conda: true
+conda-frontend: conda
+latency-wait: 30
+notemp: true
+default-resources:
+  - mem_free="32G"
+  - time="160:00:00"
+  - threads=1
