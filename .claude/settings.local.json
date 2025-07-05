@@ -40,7 +40,17 @@
       "Bash(./cluster_status_uge.sh:*)",
       "Bash(git checkout:*)",
       "Bash(export:*)",
-      "Bash(awk:*)"
+      "Bash(awk:*)",
+      "Bash(for:*)",
+      "Bash(do cp:*)",
+      "Bash(done)",
+      "Bash(do sed -i '/#$ -l mem_free=32G/d' \"$dir/run_snakemake.sh\")",
+      "Bash(do sed -i 's/reps: 20/reps: 200/' \"$dir/config/config.yml\")",
+      "Bash(./submit_all_simulations.sh:*)",
+      "Bash(git rm:*)",
+      "Bash(do)",
+      "Bash(cp:*)",
+      "Bash(sed:*)"
     ],
     "deny": []
   }
