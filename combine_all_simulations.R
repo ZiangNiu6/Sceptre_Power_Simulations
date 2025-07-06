@@ -5,6 +5,23 @@
 
 library(dplyr)
 library(readr)
+library(yaml)
+
+# Function to read config file and extract num_cells_per_pert
+read_config_num_cells <- function(subdir) {
+  config_file <- file.path(subdir, "config", "config.yml")
+  if (file.exists(config_file)) {
+    config <- read_yaml(config_file)
+    num_cells_per_pert <- config$simulate_guide_assignments$num_cells_per_pert
+    if (is.list(num_cells_per_pert)) {
+      # Take the first value if it's a list (they're usually all the same)
+      return(num_cells_per_pert[[1]])
+    } else if (is.numeric(num_cells_per_pert) && length(num_cells_per_pert) > 0) {
+      return(num_cells_per_pert[1])
+    }
+  }
+  return(NA)
+}
 
 # Function to extract simulation parameters from directory name
 extract_sim_params <- function(subdir) {
@@ -17,7 +34,8 @@ extract_sim_params <- function(subdir) {
     return(list(num_trt = num_trt, effect_size = effect_size, sim_type = sim_type))
   } else if (grepl("^effect_size_", dirname)) {
     effect_size <- as.numeric(gsub("effect_size_(\\d+\\.\\d+)", "\\1", dirname))
-    num_trt <- NA  # Will be read from the data
+    # Read intended num_cells_per_pert from config file
+    num_trt <- read_config_num_cells(subdir)
     sim_type <- "effect_size"
     return(list(num_trt = num_trt, effect_size = effect_size, sim_type = sim_type))
   } else {
@@ -69,11 +87,16 @@ for (subdir in all_sim_dirs) {
       
     } else if (sim_params$sim_type == "effect_size") {
       # For effect_size simulations, use the directory name for effect size
-      # and read treatment cells from the data
+      # and use the intended treatment cell count from config file
       results$simulation_effect_size <- sim_params$effect_size
       
-      # Calculate treatment/control cells from mean_pert_cells in data
-      num_trt <- round(mean(results$mean_pert_cells, na.rm = TRUE))
+      # Use intended treatment cell count from config file
+      num_trt <- sim_params$num_trt
+      if (is.na(num_trt)) {
+        warning(paste("Could not read num_cells_per_pert from config for", subdir, 
+                     "- using average from data"))
+        num_trt <- round(mean(results$mean_pert_cells, na.rm = TRUE))
+      }
       total_cells_for_this_trt <- num_trt * 5 + 6000
       
       results$num_treatment_cells <- num_trt
