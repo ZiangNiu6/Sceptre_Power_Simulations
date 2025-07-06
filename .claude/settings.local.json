@@ -51,10 +51,23 @@
       "Bash(do)",
       "Bash(cp:*)",
       "Bash(sed:*)",
+<<<<<<< Updated upstream
       "Bash(Rscript:*)",
       "Bash(git fetch:*)",
       "Bash(git pull:*)",
       "Bash(git rebase:*)"
+=======
+      "Bash(git fsck:*)",
+      "Bash(echo:*)",
+      "Bash(if [ -d \"$dir/results\" ])",
+      "Bash(then)",
+      "Bash(if [ -f \"$dir/results/test_data/power_analysis_results.tsv\" ])",
+      "Bash(fi)",
+      "Bash(git pull:*)",
+      "Bash(if [ -f \"$dir/results/test_data/simulated_sce_disp.rds\" ])",
+      "Bash(else)",
+      "Bash(git stash:*)"
+>>>>>>> Stashed changes
     ],
     "deny": []
   }
