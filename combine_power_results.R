@@ -6,9 +6,9 @@
 library(dplyr)
 library(readr)
 
-# Get all subdirectories that match the pattern num_trt_*
-all_dirs <- list.dirs(path = ".", full.names = TRUE, recursive = FALSE)
-subdirs <- grep("^\\./num_trt_", all_dirs, value = TRUE)
+# Get all subdirectories that match the pattern num_trt_* (now in simulation folder)
+all_dirs <- list.dirs(path = "simulation", full.names = TRUE, recursive = FALSE)
+subdirs <- grep("num_trt_", all_dirs, value = TRUE)
 
 # Initialize empty list to store results
 all_results <- list()
@@ -18,7 +18,7 @@ all_results <- list()
 # Loop through each subdirectory
 for (subdir in subdirs) {
   # Extract number of treatment cells from directory name
-  num_trt <- as.numeric(gsub(".*num_trt_(\\d+).*", "\\1", subdir))
+  num_trt <- as.numeric(gsub(".*num_trt_(\\d+).*", "\\1", basename(subdir)))
   
   # Path to power analysis results
   results_file <- file.path(subdir, "results", "test_data", "power_analysis_results.tsv")

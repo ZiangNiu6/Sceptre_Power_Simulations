@@ -6,7 +6,7 @@ library(SingleCellExperiment)
 
 # Load one of the simulated_sce_disp objects (they should all have the same rowData)
 message("Loading simulated_sce_disp object...")
-simulated_sce_disp <- readRDS("results/test_data_original/simulated_sce_disp.rds")
+simulated_sce_disp <- readRDS("model/results/test_data_original/simulated_sce_disp.rds")
 
 # Extract rowData as data.frame
 message("Extracting rowData...")
