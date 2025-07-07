@@ -5,7 +5,7 @@
 library(dplyr)
 
 # Read timing data
-timing_data <- readRDS("simulation_timing_data.rds")
+timing_data <- readRDS("results_summary/simulation_timing_data.rds")
 
 message("=== SIMULATION TIMING DATA VALIDATION ===")
 message(paste("Total records:", nrow(timing_data)))

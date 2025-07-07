@@ -5,8 +5,8 @@
 library(dplyr)
 
 # Read the averaged results
-averaged_results <- readRDS("averaged_power_results.rds")
-combined_results <- readRDS("combined_power_results.rds")
+averaged_results <- readRDS("results_summary/averaged_power_results.rds")
+combined_results <- readRDS("results_summary/combined_power_results.rds")
 
 message("=== AVERAGED POWER RESULTS ===")
 message(paste("Dimensions:", nrow(averaged_results), "rows x", ncol(averaged_results), "columns"))

@@ -44,7 +44,7 @@ extract_sim_params <- function(subdir) {
 }
 
 # Get all simulation subdirectories
-all_dirs <- list.dirs(path = "simulation", full.names = TRUE, recursive = FALSE)
+all_dirs <- list.dirs(path = "../simulation", full.names = TRUE, recursive = FALSE)
 num_trt_dirs <- grep("num_trt_", all_dirs, value = TRUE)
 effect_size_dirs <- grep("effect_size_", all_dirs, value = TRUE)
 
@@ -161,15 +161,15 @@ if (nrow(effect_size_results) > 0) {
 }
 
 # Save datasets as RDS files
-saveRDS(combined_results, "all_simulation_results.rds")
-saveRDS(averaged_results, "averaged_simulation_results.rds")
+saveRDS(combined_results, "results_summary/all_simulation_results.rds")
+saveRDS(averaged_results, "results_summary/averaged_simulation_results.rds")
 
 # Also save separate files for each simulation type
 if (nrow(num_trt_results) > 0) {
-  saveRDS(num_trt_results, "averaged_num_trt_results.rds")
+  saveRDS(num_trt_results, "results_summary/averaged_num_trt_results.rds")
 }
 if (nrow(effect_size_results) > 0) {
-  saveRDS(effect_size_results, "averaged_effect_size_results.rds")
+  saveRDS(effect_size_results, "results_summary/averaged_effect_size_results.rds")
 }
 
 message("Results saved to:")

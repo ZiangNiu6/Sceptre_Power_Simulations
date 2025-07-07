@@ -7,7 +7,7 @@ library(dplyr)
 library(readr)
 
 # Get all subdirectories that match the pattern num_trt_* (now in simulation folder)
-all_dirs <- list.dirs(path = "simulation", full.names = TRUE, recursive = FALSE)
+all_dirs <- list.dirs(path = "../simulation", full.names = TRUE, recursive = FALSE)
 subdirs <- grep("num_trt_", all_dirs, value = TRUE)
 
 # Initialize empty list to store results
@@ -64,8 +64,8 @@ message(paste("Total averaged observations:", nrow(averaged_results)))
 message(paste("Treatment cell counts analyzed:", paste(sort(unique(averaged_results$num_treatment_cells)), collapse = ", ")))
 
 # Save both datasets as RDS files
-saveRDS(combined_results, "combined_power_results.rds")
-saveRDS(averaged_results, "averaged_power_results.rds")
+saveRDS(combined_results, "results_summary/combined_power_results.rds")
+saveRDS(averaged_results, "results_summary/averaged_power_results.rds")
 
 message("Results saved to:")
 message("- combined_power_results.rds (all individual results)")

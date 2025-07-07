@@ -5,10 +5,10 @@
 library(dplyr)
 
 # Read all the results files
-all_simulation_results <- readRDS("all_simulation_results.rds")
-averaged_simulation_results <- readRDS("averaged_simulation_results.rds")
-averaged_num_trt_results <- readRDS("averaged_num_trt_results.rds")
-averaged_effect_size_results <- readRDS("averaged_effect_size_results.rds")
+all_simulation_results <- readRDS("results_summary/all_simulation_results.rds")
+averaged_simulation_results <- readRDS("results_summary/averaged_simulation_results.rds")
+averaged_num_trt_results <- readRDS("results_summary/averaged_num_trt_results.rds")
+averaged_effect_size_results <- readRDS("results_summary/averaged_effect_size_results.rds")
 
 message("=== ALL SIMULATION RESULTS SUMMARY ===")
 message(paste("Total observations:", nrow(all_simulation_results)))

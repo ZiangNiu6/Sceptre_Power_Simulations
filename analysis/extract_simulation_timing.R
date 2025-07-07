@@ -60,7 +60,7 @@ extract_simulation_type <- function(dir_path) {
 }
 
 # Get all simulation directories
-all_dirs <- list.dirs(path = "simulation", full.names = TRUE, recursive = FALSE)
+all_dirs <- list.dirs(path = "../simulation", full.names = TRUE, recursive = FALSE)
 
 # Initialize empty list to store timing data
 timing_data <- list()
@@ -147,7 +147,7 @@ if (length(timing_data) > 0) {
   }
   
   # Save timing data
-  saveRDS(timing_df, "simulation_timing_data.rds")
+  saveRDS(timing_df, "results_summary/simulation_timing_data.rds")
   message("\nTiming data saved to: simulation_timing_data.rds")
   
   # Display first few rows
