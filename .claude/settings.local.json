@@ -6,7 +6,8 @@
       "Bash(mv:*)",
       "Bash(Rscript:*)",
       "Bash(rmdir:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ],
     "deny": []
   }
