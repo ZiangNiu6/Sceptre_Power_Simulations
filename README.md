@@ -54,8 +54,6 @@ resources/<sample_name>/raw_counts.rds
 - **Format**: sparse matrix in `dgRMatrix` format, saved with `saveRDS()`
 - **Reference**: see `model/resources/test_data/raw_counts.rds` for an example
 
-**(Optional)** If you want to visualize power curves by TPM instead of UMI counts, provide a TPM file at `resources/tpm_per_gene.tsv`. See `resources/tpm_per_gene.tsv` for the expected format. This file is only used for plotting; it maps gene names to TPM values from bulk RNA-seq.
-
 ## Configuration
 
 Edit `config/config.yml` before running:
@@ -111,46 +109,9 @@ default-resources:
   - time="160:00:00"
   - threads=1
 ```
-
-**To adapt for SLURM**, replace the `cluster` line and default resources:
-
-```yaml
-jobs: 100
-slurm: True
-retries: 1
-use-conda: True
-notemp: True
-default-resources:
-  - slurm_account=your_account
-  - slurm_partition=your_partition,owners,normal
-  - runtime="6h"
-  - slurm_extra="--nice"
-```
-
 A UGE job status script (`cluster_status_uge.sh`) is provided for monitoring job completion. It polls `qstat` and falls back to `qacct` for finished jobs.
 
 ## Running the Pipeline
-
-### Single Simulation (the `model/` directory)
-
-The `model/` directory contains the canonical pipeline. To run it:
-
-```bash
-cd model/
-conda activate sceptre_power_sim
-
-# Dry run — verify configuration without executing
-snakemake --use-conda all -np
-
-# Full run — submit to cluster
-snakemake --profile snakemake_profiles/uge_profile --restart-times 2 all
-```
-
-Or submit the entire pipeline as a single UGE job:
-
-```bash
-qsub run_snakemake.sh
-```
 
 ### Effect Size Sweep (8 simulations)
 
@@ -173,80 +134,6 @@ Submit all 8 simulations simultaneously:
 ```bash
 bash submit_num_trt_simulations.sh
 ```
-
-### Monitoring Jobs
-
-```bash
-qstat -u $USER         # List your running/pending jobs
-qstat -f               # Detailed job information
-```
-
-## Pipeline Workflow (DAG)
-
-The Snakemake pipeline executes the following rules in order. Rules 1–4 are sequential setup steps; rule 5 runs in parallel across splits.
-
-```
-raw_counts.rds
-      │
-      ▼
-┌─────────────────────────────┐
-│ 1. simulate_guide_assignments│  Simulate guide/perturbation assignments
-│                              │  at each cell count level
-└──────────────┬──────────────┘
-               ▼
-┌─────────────────────────────┐
-│ 2. fit_dispersions           │  Fit negative binomial dispersion
-│                              │  estimates and size factors
-└──────────────┬──────────────┘
-               ▼
-     ┌─────────┴─────────┐
-     ▼                   ▼
-┌────────────┐   ┌───────────────────────┐
-│ 3. split   │   │ 4. create_simulated   │  Build reusable sceptre
-│  target-   │   │    sceptre_object     │  object template
-│  response  │   │                       │
-│  pairs     │   └───────────┬───────────┘
-└─────┬──────┘               │
-      └──────────┬───────────┘
-                 ▼
-┌─────────────────────────────┐
-│ 5. sceptre_power_analysis    │  Run power simulation per split
-│    (parallelized × N splits) │  (N reps of DE testing per split)
-└──────────────┬──────────────┘
-               ▼
-┌─────────────────────────────┐
-│ 6. combine_sceptre_power    │  Merge split outputs into one TSV
-│    _analysis                 │
-└──────────────┬──────────────┘
-               ▼
-┌─────────────────────────────┐
-│ 7. compute_power_from       │  Compute power (rejection rate)
-│    _simulations              │  from BH-adjusted p-values
-└──────────────┬──────────────┘
-               ▼
-┌─────────────────────────────┐
-│ 8. visualize_power_results   │  Render HTML report with
-│                              │  power curves
-└─────────────────────────────┘
-```
-
-### Rule Details
-
-| Rule | Script | Environment | Memory | Description |
-|---|---|---|---|---|
-| `simulate_guide_assignments` | `simulate_guide_assignments.R` | sceptre_power_simulations | 64G | Assigns cells to perturbation groups at each cell count level |
-| `fit_dispersions` | `fit_negbinom_distr.R` | analyze_crispr_screen | 32G | Estimates per-gene dispersion and size factors from real data |
-| `split_target_response_pairs` | `split_target_response_pairs.R` | sceptre_power_simulations | 16G | Splits gene–perturbation pairs into parallel batches |
-| `create_simulated_sceptre_object` | `create_simulated_sceptre_object.R` | sceptre_power_simulations | 32G | Builds a template sceptre object for simulation |
-| `sceptre_power_analysis` | `sceptre_power_analysis.R` | sceptre_power_simulations | 8G | Simulates expression, runs DE test, repeats for N reps |
-| `combine_sceptre_power_analysis` | `combine_sceptre_power_analysis.R` | sceptre_power_simulations | 32G | Concatenates per-split TSV files |
-| `compute_power_from_simulations` | `compute_power_from_simulations.R` | sceptre_power_simulations | 24G | Computes power per gene–perturbation pair |
-| `visualize_power_results` | `visualize_power_results.Rmd` | analyze_crispr_screen | — | Renders interactive HTML report |
-
-Helper R functions used across rules are in `workflow/scripts/R_functions/`:
-- `differential_expression_fun.R` — DE testing utilities
-- `power_simulations_fun.R` — power simulation core logic
-- `simulate_perturbations.R` — perturbation effect simulation
 
 ## Output Files
 
@@ -311,16 +198,6 @@ Rscript validate_all_simulations.R
 | Effect size | 0.05–0.40 | 3.3%–69.6% | 1,000 cells per perturbation |
 
 Average runtime per effect size simulation: ~9 hours.
-
-## Troubleshooting
-
-| Issue | Cause | Solution |
-|---|---|---|
-| Snakemake lock error | Previous run left a lock file | Run `snakemake --unlock` before resubmitting |
-| Jobs fail on large splits | Wall-time limit exceeded | Use `--restart-times 2` (already set in `run_snakemake.sh`) |
-| High memory usage (~8 GB per split) | Each split loads the full dataset | 32 GB allocation handles this; no code change needed |
-| Results differ between runs | No random seeds set in simulation scripts | Expected behavior; results are structurally valid but not bitwise reproducible |
-| Conda environment build fails | Network or solver issues | Try `conda config --set solver libmamba` or use `mamba` |
 
 ## Repository Structure
 

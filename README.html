@@ -440,12 +440,6 @@ format, saved with <code>saveRDS()</code></li>
 <code>model/resources/test_data/raw_counts.rds</code> for an
 example</li>
 </ul>
-<p><strong>(Optional)</strong> If you want to visualize power curves by
-TPM instead of UMI counts, provide a TPM file at
-<code>resources/tpm_per_gene.tsv</code>. See
-<code>resources/tpm_per_gene.tsv</code> for the expected format. This
-file is only used for plotting; it maps gene names to TPM values from
-bulk RNA-seq.</p>
 </div>
 <div id="configuration" class="section level2">
 <h2>Configuration</h2>
@@ -550,39 +544,12 @@ default-resources:
   - mem_free=&quot;32G&quot;
   - time=&quot;160:00:00&quot;
   - threads=1</code></pre>
-<p><strong>To adapt for SLURM</strong>, replace the <code>cluster</code>
-line and default resources:</p>
-<pre class="yaml"><code>jobs: 100
-slurm: True
-retries: 1
-use-conda: True
-notemp: True
-default-resources:
-  - slurm_account=your_account
-  - slurm_partition=your_partition,owners,normal
-  - runtime=&quot;6h&quot;
-  - slurm_extra=&quot;--nice&quot;</code></pre>
 <p>A UGE job status script (<code>cluster_status_uge.sh</code>) is
 provided for monitoring job completion. It polls <code>qstat</code> and
 falls back to <code>qacct</code> for finished jobs.</p>
 </div>
 <div id="running-the-pipeline" class="section level2">
 <h2>Running the Pipeline</h2>
-<div id="single-simulation-the-model-directory" class="section level3">
-<h3>Single Simulation (the <code>model/</code> directory)</h3>
-<p>The <code>model/</code> directory contains the canonical pipeline. To
-run it:</p>
-<pre class="bash"><code>cd model/
-conda activate sceptre_power_sim
-
-# Dry run — verify configuration without executing
-snakemake --use-conda all -np
-
-# Full run — submit to cluster
-snakemake --profile snakemake_profiles/uge_profile --restart-times 2 all</code></pre>
-<p>Or submit the entire pipeline as a single UGE job:</p>
-<pre class="bash"><code>qsub run_snakemake.sh</code></pre>
-</div>
 <div id="effect-size-sweep-8-simulations" class="section level3">
 <h3>Effect Size Sweep (8 simulations)</h3>
 <p>The <code>simulation/effect_size_*</code> directories (0.05, 0.10,
@@ -600,144 +567,6 @@ with: - <strong>Varied</strong>: <code>effect_size</code> (0.05–0.40) -
 fixed effect size of 0.15.</p>
 <p>Submit all 8 simulations simultaneously:</p>
 <pre class="bash"><code>bash submit_num_trt_simulations.sh</code></pre>
-</div>
-<div id="monitoring-jobs" class="section level3">
-<h3>Monitoring Jobs</h3>
-<pre class="bash"><code>qstat -u $USER         # List your running/pending jobs
-qstat -f               # Detailed job information</code></pre>
-</div>
-</div>
-<div id="pipeline-workflow-dag" class="section level2">
-<h2>Pipeline Workflow (DAG)</h2>
-<p>The Snakemake pipeline executes the following rules in order. Rules
-1–4 are sequential setup steps; rule 5 runs in parallel across
-splits.</p>
-<pre><code>raw_counts.rds
-      │
-      ▼
-┌─────────────────────────────┐
-│ 1. simulate_guide_assignments│  Simulate guide/perturbation assignments
-│                              │  at each cell count level
-└──────────────┬──────────────┘
-               ▼
-┌─────────────────────────────┐
-│ 2. fit_dispersions           │  Fit negative binomial dispersion
-│                              │  estimates and size factors
-└──────────────┬──────────────┘
-               ▼
-     ┌─────────┴─────────┐
-     ▼                   ▼
-┌────────────┐   ┌───────────────────────┐
-│ 3. split   │   │ 4. create_simulated   │  Build reusable sceptre
-│  target-   │   │    sceptre_object     │  object template
-│  response  │   │                       │
-│  pairs     │   └───────────┬───────────┘
-└─────┬──────┘               │
-      └──────────┬───────────┘
-                 ▼
-┌─────────────────────────────┐
-│ 5. sceptre_power_analysis    │  Run power simulation per split
-│    (parallelized × N splits) │  (N reps of DE testing per split)
-└──────────────┬──────────────┘
-               ▼
-┌─────────────────────────────┐
-│ 6. combine_sceptre_power    │  Merge split outputs into one TSV
-│    _analysis                 │
-└──────────────┬──────────────┘
-               ▼
-┌─────────────────────────────┐
-│ 7. compute_power_from       │  Compute power (rejection rate)
-│    _simulations              │  from BH-adjusted p-values
-└──────────────┬──────────────┘
-               ▼
-┌─────────────────────────────┐
-│ 8. visualize_power_results   │  Render HTML report with
-│                              │  power curves
-└─────────────────────────────┘</code></pre>
-<div id="rule-details" class="section level3">
-<h3>Rule Details</h3>
-<table>
-<colgroup>
-<col width="20%" />
-<col width="20%" />
-<col width="20%" />
-<col width="20%" />
-<col width="20%" />
-</colgroup>
-<thead>
-<tr class="header">
-<th>Rule</th>
-<th>Script</th>
-<th>Environment</th>
-<th>Memory</th>
-<th>Description</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td><code>simulate_guide_assignments</code></td>
-<td><code>simulate_guide_assignments.R</code></td>
-<td>sceptre_power_simulations</td>
-<td>64G</td>
-<td>Assigns cells to perturbation groups at each cell count level</td>
-</tr>
-<tr class="even">
-<td><code>fit_dispersions</code></td>
-<td><code>fit_negbinom_distr.R</code></td>
-<td>analyze_crispr_screen</td>
-<td>32G</td>
-<td>Estimates per-gene dispersion and size factors from real data</td>
-</tr>
-<tr class="odd">
-<td><code>split_target_response_pairs</code></td>
-<td><code>split_target_response_pairs.R</code></td>
-<td>sceptre_power_simulations</td>
-<td>16G</td>
-<td>Splits gene–perturbation pairs into parallel batches</td>
-</tr>
-<tr class="even">
-<td><code>create_simulated_sceptre_object</code></td>
-<td><code>create_simulated_sceptre_object.R</code></td>
-<td>sceptre_power_simulations</td>
-<td>32G</td>
-<td>Builds a template sceptre object for simulation</td>
-</tr>
-<tr class="odd">
-<td><code>sceptre_power_analysis</code></td>
-<td><code>sceptre_power_analysis.R</code></td>
-<td>sceptre_power_simulations</td>
-<td>8G</td>
-<td>Simulates expression, runs DE test, repeats for N reps</td>
-</tr>
-<tr class="even">
-<td><code>combine_sceptre_power_analysis</code></td>
-<td><code>combine_sceptre_power_analysis.R</code></td>
-<td>sceptre_power_simulations</td>
-<td>32G</td>
-<td>Concatenates per-split TSV files</td>
-</tr>
-<tr class="odd">
-<td><code>compute_power_from_simulations</code></td>
-<td><code>compute_power_from_simulations.R</code></td>
-<td>sceptre_power_simulations</td>
-<td>24G</td>
-<td>Computes power per gene–perturbation pair</td>
-</tr>
-<tr class="even">
-<td><code>visualize_power_results</code></td>
-<td><code>visualize_power_results.Rmd</code></td>
-<td>analyze_crispr_screen</td>
-<td>—</td>
-<td>Renders interactive HTML report</td>
-</tr>
-</tbody>
-</table>
-<p>Helper R functions used across rules are in
-<code>workflow/scripts/R_functions/</code>: -
-<code>differential_expression_fun.R</code> — DE testing utilities -
-<code>power_simulations_fun.R</code> — power simulation core logic -
-<code>simulate_perturbations.R</code> — perturbation effect
-simulation</p>
 </div>
 </div>
 <div id="output-files" class="section level2">
@@ -921,53 +750,6 @@ effect_size)</td>
 </tbody>
 </table>
 <p>Average runtime per effect size simulation: ~9 hours.</p>
-</div>
-<div id="troubleshooting" class="section level2">
-<h2>Troubleshooting</h2>
-<table>
-<colgroup>
-<col width="33%" />
-<col width="33%" />
-<col width="33%" />
-</colgroup>
-<thead>
-<tr class="header">
-<th>Issue</th>
-<th>Cause</th>
-<th>Solution</th>
-</tr>
-</thead>
-<tbody>
-<tr class="odd">
-<td>Snakemake lock error</td>
-<td>Previous run left a lock file</td>
-<td>Run <code>snakemake --unlock</code> before resubmitting</td>
-</tr>
-<tr class="even">
-<td>Jobs fail on large splits</td>
-<td>Wall-time limit exceeded</td>
-<td>Use <code>--restart-times 2</code> (already set in
-<code>run_snakemake.sh</code>)</td>
-</tr>
-<tr class="odd">
-<td>High memory usage (~8 GB per split)</td>
-<td>Each split loads the full dataset</td>
-<td>32 GB allocation handles this; no code change needed</td>
-</tr>
-<tr class="even">
-<td>Results differ between runs</td>
-<td>No random seeds set in simulation scripts</td>
-<td>Expected behavior; results are structurally valid but not bitwise
-reproducible</td>
-</tr>
-<tr class="odd">
-<td>Conda environment build fails</td>
-<td>Network or solver issues</td>
-<td>Try <code>conda config --set solver libmamba</code> or use
-<code>mamba</code></td>
-</tr>
-</tbody>
-</table>
 </div>
 <div id="repository-structure" class="section level2">
 <h2>Repository Structure</h2>
