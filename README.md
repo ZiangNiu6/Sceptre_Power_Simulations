@@ -1,51 +1,66 @@
 # Sceptre-based Power Simulations
 
-## About The Project
+## Overview
 
-The **Sceptre-based Power Simulations** pipeline is designed to help determine the number of cells needed in CRISPRi or CRISPRko experiments to achieve a desired statistical power (e.g., 80%) for detecting a specific percentage decrease in gene expression. By simulating different effect sizes and cell numbers, this tool provides valuable insights for experimental design and helps determine the feasibility of detecting small changes in gene expression.
+This pipeline estimates the **statistical power** of single-cell CRISPR screens (CRISPRi/CRISPRko) using the [sceptre](https://timothy-barry.github.io/sceptre-book/) R package. The pipeline sweeps over two experimental axes:
+- **Cell count per perturbation** at a fixed effect size
+- **Effect size** at a fixed cell count
 
-This pipeline leverages the **sceptre** R package, which offers a statistically rigorous and scalable approach for single-cell CRISPR screen data analysis. It calculates mean expression and dispersion from your input data, simulates a specified percentage decrease in gene expression, and computes the statistical power to detect that change across varying numbers of cells.
+Results are power curves that guide experimental design and feasibility assessment.
 
-## Installation
+## Prerequisites
 
-To get started with the Sceptre-based Power Simulations pipeline, follow these steps:
+- **Linux** (the conda environments and cluster integration target linux-64)
+- **Conda** or **Miniconda** installed
+- **HPC cluster** with a job scheduler (UGE or SLURM) for distributed execution
+- `qsub`/`qstat` (UGE) or equivalent SLURM commands available
 
-1. **Clone the Repository**
+## Installation & Environment Setup
 
-   ```bash
-   git clone https://github.com/jamesgalante/Sceptre_Power_Simulations.git
-   cd Sceptre_Power_Simulations
-   ```
+### 1. Clone the Repository
 
-2. **Create a Conda Environment with Snakemake**
+```bash
+git clone https://github.com/ZiangNiu6/Sceptre_Power_Simulations.git
+cd Sceptre_Power_Simulations
+```
 
-   It's recommended to create a new conda environment specifically for this project. We'll install Snakemake version `7.32.4`.
+### 2. Create the Snakemake Driver Environment
 
-   ```bash
-   conda create -n sceptre_power_sim python=3.9
-   conda activate sceptre_power_sim
-   conda install -c bioconda snakemake=7.32.4
-   ```
+This is the main environment used to launch the pipeline:
 
-   *Note:* All other required packages will be dynamically downloaded when the Snakemake pipeline is run.
+```bash
+conda create -n sceptre_power_sim python=3.9
+conda activate sceptre_power_sim
+conda install -c bioconda snakemake=7.32.4
+```
 
-## Usage
+### 3. Rule-Level Conda Environments (Auto-Created)
 
-### Input Data Preparation
+Snakemake automatically builds two additional R environments on the first run via `--use-conda`. You do **not** need to create these manually:
 
-The pipeline requires a raw counts matrix in the form of a `.rds` file (created with saveRDS). This file should be a `dgRMatrix` format. An example of the expected format can be found in `resources/test_data/raw_counts.rds`.
+| Environment | Defined in | Key packages | Used by |
+|---|---|---|---|
+| `sceptre_power_simulations` | `workflow/envs/sceptre_power_simulations.yml` | R 4.1.2, sceptre, tidyverse, data.table | Most pipeline rules |
+| `analyze_crispr_screen` | `workflow/envs/analyze_crispr_screen.yml` | R 4.1.1, DESeq2, MAST, scran | `fit_dispersions`, `visualize_power_results` |
 
-If you wish to visualize the power simulations results by TPM instead of UMIs, provide a TPM file formatted as in `resources/tpm_per_gene.tsv`. The TPM file is only used to match your input genes with the power simulation results during plotting. If you are designing a screen based on TPM values, this might be a good option. Since single-cell UMIs may differ from TPM calculated values in bulk screens, the resulting plots may look more jagged.
+## Input Data Preparation
 
-### Configuring the Pipeline
+Place your raw counts matrix in the `resources/` directory:
 
-Before running the pipeline, you need to set up the configuration file `config.yaml`. This file controls various parameters of the simulation and analysis.
+```
+resources/<sample_name>/raw_counts.rds
+```
 
-Here is an example of the `config.yaml` file:
+- **Format**: sparse matrix in `dgRMatrix` format, saved with `saveRDS()`
+- **Reference**: see `model/resources/test_data/raw_counts.rds` for an example
+
+**(Optional)** If you want to visualize power curves by TPM instead of UMI counts, provide a TPM file at `resources/tpm_per_gene.tsv`. See `resources/tpm_per_gene.tsv` for the expected format. This file is only used for plotting; it maps gene names to TPM values from bulk RNA-seq.
+
+## Configuration
+
+Edit `config/config.yml` before running:
 
 ```yaml
-# Main Config File Format for Sceptre-based Power Simulations Pipeline
-
 samples:
   your_sample_name
 
@@ -61,91 +76,297 @@ compute_power_from_simulations:
   positive_proportion: 0.05
 
 visualize_power_results:
-  tpm_per_gene: "resources/tpm_per_gene.tsv"  # Set to NULL if not using TPM
-  gene_format: "ensembl"  # Must be "ensembl" or "symbol"
+  tpm_per_gene: NULL
+  gene_format: "ensembl"
 ```
 
-#### Configuration Parameters Explained
+### Parameter Reference
 
-- **samples**: A list containing the names of the samples you wish to analyze. Each sample name should correspond to a directory in `resources/` that contains the `raw_counts.rds` file. Replace `your_sample_name` with your actual sample name.
+| Parameter | Description | Default |
+|---|---|---|
+| `samples` | Sample name; must match a directory under `resources/` containing `raw_counts.rds` | `test_data` |
+| `num_cells_per_pert` | List of cell counts per perturbation to simulate. Each entry creates one parallel split. | `[50, ..., 10000]` (14 values) |
+| `effect_size` | Fractional decrease in gene expression to simulate (e.g., `0.15` = 15% decrease) | `0.15` |
+| `reps` | Number of simulation replicates per condition. More reps reduce noise but increase runtime. | `20` |
+| `pval_adj_thresh` | Benjamini-Hochberg adjusted p-value threshold for significance | `0.1` |
+| `positive_proportion` | Expected fraction of true positives (affects BH correction). Typically low for CRISPR screens. | `0.05` |
+| `tpm_per_gene` | Path to TPM file for TPM-based visualization. Set to `NULL` to use UMI counts. | `NULL` |
+| `gene_format` | Gene name format: `"ensembl"` or `"symbol"` | `"ensembl"` |
 
-- **simulate_guide_assignments**:
-  - **num_cells_per_pert**: A list of numbers representing the different counts of cells per perturbation you want to simulate. The pipeline will assess the statistical power for each specified cell count.
+## Cluster Configuration
 
-- **sceptre_power_analysis**:
-  - **effect_size**: The percent decrease in gene expression you wish to simulate. For example, `0.15` represents a 15% decrease.
-  - **reps**: The number of simulation replicates to run for each condition. More replicates reduce noise but increase computational time. A value of `20` is typically sufficient.
+The pipeline uses a Snakemake profile for cluster job submission, located at `snakemake_profiles/uge_profile/config.yaml`:
 
-- **compute_power_from_simulations**:
-  - **pval_adj_thresh**: The adjusted p-value threshold for determining statistical significance after applying Benjamini-Hochberg (BH) correction. The default Sceptre recommendation is `0.1`.
-  - **positive_proportion**: The expected proportion of true positives (genes with actual expression changes) in your data. This parameter is important because the BH correction assumes a certain proportion of null hypotheses. This number is hard to estimate before running an experiment, but for CRISPR screens, the proportion of positive tests is typically low. A value of `0.05` corresponds to 5% of the resulting tests being positives.
+```yaml
+cluster: "qsub -j y -cwd -V -P <team_name> -l m_mem_free={resources.mem_free} -l h_rt={resources.time} -pe openmp {threads} -N {rule}"
+cluster-cancel: "qdel {jobid}"
+jobs: 20
+retries: 1
+use-conda: true
+conda-frontend: conda
+latency-wait: 30
+notemp: true
+default-resources:
+  - mem_free="32G"
+  - time="160:00:00"
+  - threads=1
+```
 
-- **visualize_power_results**:
-  - **tpm_per_gene**: Path to the TPM per gene file. If you wish to use UMI counts instead, set this to `NULL`. See the example `resources/tpm_per_gene.tsv` for formatting requirements.
-  - **gene_format**: Specifies the format of gene names used in your data. Must be either `"ensembl"` or `"symbol"` or refer to a specific column in the TPM file.
+**To adapt for SLURM**, replace the `cluster` line and default resources:
 
-### Running the Pipeline
+```yaml
+jobs: 100
+slurm: True
+retries: 1
+use-conda: True
+notemp: True
+default-resources:
+  - slurm_account=your_account
+  - slurm_partition=your_partition,owners,normal
+  - runtime="6h"
+  - slurm_extra="--nice"
+```
 
-To execute the pipeline, run the following commands from the root directory of the project:
+A UGE job status script (`cluster_status_uge.sh`) is provided for monitoring job completion. It polls `qstat` and falls back to `qacct` for finished jobs.
 
-1. **Dry Run**
+## Running the Pipeline
 
-   It's good practice to perform a dry run to ensure that the pipeline is configured correctly and all files are in place.
+### Single Simulation (the `model/` directory)
 
-   ```bash
-   snakemake --use-conda all -np
-   ```
+The `model/` directory contains the canonical pipeline. To run it:
 
-   This command will show you what steps the pipeline will perform without actually executing them.
+```bash
+cd model/
+conda activate sceptre_power_sim
 
-2. **Full Run**
+# Dry run — verify configuration without executing
+snakemake --use-conda all -np
 
-   If the dry run looks correct, execute the pipeline:
+# Full run — submit to cluster
+snakemake --profile snakemake_profiles/uge_profile --restart-times 2 all
+```
 
-   ```bash
-   snakemake --use-conda all
-   ```
+Or submit the entire pipeline as a single UGE job:
 
-   *Note:* The `--use-conda` flag tells Snakemake to create and use the necessary conda environments for each rule.
-   *Note:* See the relevant documentation [Snakemake Documentation](https://snakemake.readthedocs.io/en/stable/index.html) to understand what flags might be necessary. If using slurm, it might be easiest to create a snakemake profile in `~/.config/snakemake/profile_name/config.yml`. Here is an example profile:
-   
-   ```yaml
-   jobs: 100 
-   slurm: True 
-   retries: 1
-   use-conda: True 
-   notemp: True 
-   default-resources: 
-       - slurm_account=slurm_account_name
-       - slurm_partition=slurm_account_name,owners,normal
-       - runtime="6h"
-       - slurm_extra="--nice"
-   ```
-   The pipeline can then be run with `snakemake --profile profile_name all`
+```bash
+qsub run_snakemake.sh
+```
 
-#### Troubleshooting
+### Effect Size Sweep (8 simulations)
 
-- If you encounter issues, you can test the pipeline with the provided test data. Rename or delete the `results/test_data/` directory and run the pipeline again to ensure everything works as expected.
+The `simulation/effect_size_*` directories (0.05, 0.10, 0.15, 0.20, 0.25, 0.30, 0.35, 0.40) each contain a full pipeline copy with:
+- **Varied**: `effect_size` (0.05–0.40)
+- **Fixed**: `num_cells_per_pert` = 1,000 cells (uniform across all splits), `reps` = 200
 
-- Ensure that your `config.yaml` file is properly configured and that the `raw_counts.rds` object matches the format of the `test_data`.
+Submit all 8 simulations simultaneously from the project root:
 
+```bash
+bash submit_effect_size_simulations.sh
+```
 
-## How It Works
+### Treatment Cell Count Sweep (8 simulations)
 
-The pipeline simulates gene expression data to assess the statistical power of detecting specified effect sizes across varying numbers of cells. It begins by calculating mean expression and dispersion for each gene from your input data. Cells are then assigned to control or perturbation groups, simulating a decrease in expression based on the specified effect size. Using the sceptre package, differential expression analysis is performed, and p-values are adjusted using the Benjamini-Hochberg procedure, considering the expected proportion of true positives. Finally, the pipeline computes the power for each condition and generates visualizations to help interpret the results.
+The `simulation/num_trt_*` directories (250, 500, 750, 1000, 1250, 1500, 1750, 2000) vary the number of treatment cells at a fixed effect size of 0.15.
 
-## Notes
+Submit all 8 simulations simultaneously:
 
-- **Data Format**: Ensure that your input data is correctly formatted. The gene names should match between your raw counts matrix and the TPM file (if used).
+```bash
+bash submit_num_trt_simulations.sh
+```
 
-- **Sceptre Package**: The sceptre package is maintained by another team. This pipeline utilizes it for its efficiency and statistical robustness in single-cell CRISPR screen analysis. For more details, refer to their documentation.
+### Monitoring Jobs
 
-- **Understanding FDR Correction**: The Benjamini-Hochberg procedure assumes a certain proportion of true positives. The `positive_proportion` parameter allows you to adjust this assumption based on your experimental context.
+```bash
+qstat -u $USER         # List your running/pending jobs
+qstat -f               # Detailed job information
+```
 
-- **TO DO**: Use dispersion estimates calculated by Sceptre
+## Pipeline Workflow (DAG)
+
+The Snakemake pipeline executes the following rules in order. Rules 1–4 are sequential setup steps; rule 5 runs in parallel across splits.
+
+```
+raw_counts.rds
+      │
+      ▼
+┌─────────────────────────────┐
+│ 1. simulate_guide_assignments│  Simulate guide/perturbation assignments
+│                              │  at each cell count level
+└──────────────┬──────────────┘
+               ▼
+┌─────────────────────────────┐
+│ 2. fit_dispersions           │  Fit negative binomial dispersion
+│                              │  estimates and size factors
+└──────────────┬──────────────┘
+               ▼
+     ┌─────────┴─────────┐
+     ▼                   ▼
+┌────────────┐   ┌───────────────────────┐
+│ 3. split   │   │ 4. create_simulated   │  Build reusable sceptre
+│  target-   │   │    sceptre_object     │  object template
+│  response  │   │                       │
+│  pairs     │   └───────────┬───────────┘
+└─────┬──────┘               │
+      └──────────┬───────────┘
+                 ▼
+┌─────────────────────────────┐
+│ 5. sceptre_power_analysis    │  Run power simulation per split
+│    (parallelized × N splits) │  (N reps of DE testing per split)
+└──────────────┬──────────────┘
+               ▼
+┌─────────────────────────────┐
+│ 6. combine_sceptre_power    │  Merge split outputs into one TSV
+│    _analysis                 │
+└──────────────┬──────────────┘
+               ▼
+┌─────────────────────────────┐
+│ 7. compute_power_from       │  Compute power (rejection rate)
+│    _simulations              │  from BH-adjusted p-values
+└──────────────┬──────────────┘
+               ▼
+┌─────────────────────────────┐
+│ 8. visualize_power_results   │  Render HTML report with
+│                              │  power curves
+└─────────────────────────────┘
+```
+
+### Rule Details
+
+| Rule | Script | Environment | Memory | Description |
+|---|---|---|---|---|
+| `simulate_guide_assignments` | `simulate_guide_assignments.R` | sceptre_power_simulations | 64G | Assigns cells to perturbation groups at each cell count level |
+| `fit_dispersions` | `fit_negbinom_distr.R` | analyze_crispr_screen | 32G | Estimates per-gene dispersion and size factors from real data |
+| `split_target_response_pairs` | `split_target_response_pairs.R` | sceptre_power_simulations | 16G | Splits gene–perturbation pairs into parallel batches |
+| `create_simulated_sceptre_object` | `create_simulated_sceptre_object.R` | sceptre_power_simulations | 32G | Builds a template sceptre object for simulation |
+| `sceptre_power_analysis` | `sceptre_power_analysis.R` | sceptre_power_simulations | 8G | Simulates expression, runs DE test, repeats for N reps |
+| `combine_sceptre_power_analysis` | `combine_sceptre_power_analysis.R` | sceptre_power_simulations | 32G | Concatenates per-split TSV files |
+| `compute_power_from_simulations` | `compute_power_from_simulations.R` | sceptre_power_simulations | 24G | Computes power per gene–perturbation pair |
+| `visualize_power_results` | `visualize_power_results.Rmd` | analyze_crispr_screen | — | Renders interactive HTML report |
+
+Helper R functions used across rules are in `workflow/scripts/R_functions/`:
+- `differential_expression_fun.R` — DE testing utilities
+- `power_simulations_fun.R` — power simulation core logic
+- `simulate_perturbations.R` — perturbation effect simulation
+
+## Output Files
+
+### Per-Simulation Outputs (`results/<sample>/`)
+
+| File | Description |
+|---|---|
+| `simulated_sce.rds` | SingleCellExperiment with simulated guide assignments |
+| `simulated_sce_disp.rds` | Above + fitted dispersion estimates and size factors |
+| `power_analysis_split/power_analysis_output_*.tsv` | Per-split raw power analysis results |
+| `power_analysis_output.tsv` | Combined raw results across all splits |
+| `power_analysis_results.tsv` | Final power table with columns: `grna_target`, `response_id`, `average_expression_all_cells`, `mean_pert_cells`, `power`, `effect_size` |
+| `power_analysis_plots.html` | Interactive HTML visualization of power curves |
+| `logs/` | Per-rule log files for debugging |
+
+### Intermediate Resources (`resources/<sample>/`)
+
+| File | Description |
+|---|---|
+| `raw_counts.rds` | Input sparse count matrix |
+| `discovery_pairs.txt` | All gene–perturbation pairs to test |
+| `pair_splits/discovery_pairs_split_*.txt` | Batched pair files for parallel execution |
+| `grna_target_data_frame.txt` | Guide RNA–target mapping |
+| `simulated_sceptre_object.rds` | Reusable sceptre object template |
+
+## Post-Simulation Analysis
+
+After all simulations finish, aggregate and validate results from the `analysis/` directory:
+
+```bash
+cd analysis/
+
+# Combine results across all effect_size and num_trt simulations
+Rscript combine_all_simulations.R
+
+# Extract gene baseline expression metadata
+Rscript extract_baseline_expression.R
+
+# Extract simulation runtime data
+Rscript extract_simulation_timing.R
+
+# Validate results
+Rscript validate_all_simulations.R
+```
+
+### Aggregated Outputs (`analysis/results_summary/`)
+
+| File | Description |
+|---|---|
+| `all_simulation_results.rds` | All individual observations across simulations (117,824 rows) |
+| `averaged_simulation_results.rds` | Averaged power across genes (16 rows: 8 num_trt + 8 effect_size) |
+| `averaged_num_trt_results.rds` | Averaged power by treatment cell count |
+| `averaged_effect_size_results.rds` | Averaged power by effect size |
+| `baseline_expression.rds` | Per-gene baseline expression and dispersion |
+| `simulation_timing_data.rds` | Runtime data for each simulation |
+
+## Key Results
+
+| Simulation axis | Range | Power range | Fixed parameters |
+|---|---|---|---|
+| Treatment cell count | 250–2,000 cells | 8.6%–45.7% | effect size = 0.15 |
+| Effect size | 0.05–0.40 | 3.3%–69.6% | 1,000 cells per perturbation |
+
+Average runtime per effect size simulation: ~9 hours.
+
+## Troubleshooting
+
+| Issue | Cause | Solution |
+|---|---|---|
+| Snakemake lock error | Previous run left a lock file | Run `snakemake --unlock` before resubmitting |
+| Jobs fail on large splits | Wall-time limit exceeded | Use `--restart-times 2` (already set in `run_snakemake.sh`) |
+| High memory usage (~8 GB per split) | Each split loads the full dataset | 32 GB allocation handles this; no code change needed |
+| Results differ between runs | No random seeds set in simulation scripts | Expected behavior; results are structurally valid but not bitwise reproducible |
+| Conda environment build fails | Network or solver issues | Try `conda config --set solver libmamba` or use `mamba` |
+
+## Repository Structure
+
+```
+Sceptre_Power_Simulations/
+├── model/                                  # Canonical pipeline (template)
+│   ├── config/config.yml                   # Configuration file
+│   ├── run_snakemake.sh                    # UGE submission script
+│   ├── snakemake_profiles/uge_profile/     # Cluster profile
+│   ├── resources/test_data/               # Input data
+│   ├── results/test_data/                 # Output results
+│   └── workflow/
+│       ├── Snakefile                       # Main workflow definition
+│       ├── rules/                          # Rule definitions
+│       │   ├── simulate_guide_assignments.smk
+│       │   └── run_power_analysis.smk
+│       ├── scripts/                        # R analysis scripts
+│       │   ├── simulate_guide_assignments.R
+│       │   ├── fit_negbinom_distr.R
+│       │   ├── split_target_response_pairs.R
+│       │   ├── create_simulated_sceptre_object.R
+│       │   ├── sceptre_power_analysis.R
+│       │   ├── combine_sceptre_power_analysis.R
+│       │   ├── compute_power_from_simulations.R
+│       │   ├── visualize_power_results.Rmd
+│       │   └── R_functions/               # Shared helper functions
+│       └── envs/                           # Conda environment definitions
+│           ├── sceptre_power_simulations.yml
+│           └── analyze_crispr_screen.yml
+├── simulation/                             # Parameter sweep simulations
+│   ├── effect_size_{0.05..0.40}/          # 8 effect size scenarios
+│   └── num_trt_{250..2000}/               # 8 treatment count scenarios
+├── analysis/                               # Post-simulation aggregation
+│   ├── combine_all_simulations.R
+│   ├── extract_baseline_expression.R
+│   ├── extract_simulation_timing.R
+│   ├── validate_*.R
+│   └── results_summary/                   # Aggregated output files
+├── submit_effect_size_simulations.sh       # Batch submit all effect size sims
+├── submit_num_trt_simulations.sh           # Batch submit all num_trt sims
+├── cluster_status_uge.sh                   # UGE job status checker
+└── README.md
+```
 
 ## References
 
-- **Sceptre Package Documentation**: [Hands-On Single-Cell CRISPR Screen Analysis](https://timothy-barry.github.io/sceptre-book/)
-
----
+- **Sceptre package**: [Hands-On Single-Cell CRISPR Screen Analysis](https://timothy-barry.github.io/sceptre-book/)
+- **Upstream repository**: [jamesgalante/Sceptre_Power_Simulations](https://github.com/jamesgalante/Sceptre_Power_Simulations)
+- **Snakemake documentation**: [snakemake.readthedocs.io](https://snakemake.readthedocs.io/en/stable/index.html)
