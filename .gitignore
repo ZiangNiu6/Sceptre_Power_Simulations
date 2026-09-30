@@ -41,3 +41,6 @@ simulation/effect_size_*/results/test_data/logs/
 !simulation/effect_size_*/simulation_timing.log
 !simulation/effect_size_*/resources/test_data/simulated_sceptre_object.rds
 !simulation/effect_size_*/results/test_data/power_analysis_results.tsv
+
+# Claude Code personal/machine-local settings (keep CLAUDE.md tracked)
+.claude/settings.local.json
