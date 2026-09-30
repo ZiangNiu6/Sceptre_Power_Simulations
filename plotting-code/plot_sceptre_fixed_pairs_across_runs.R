@@ -20,26 +20,20 @@ script_arg <- grep("^--file=", commandArgs(trailingOnly = FALSE), value = TRUE)
 if (length(script_arg) != 1L) stop("Run this script with Rscript.")
 script_dir <- dirname(normalizePath(sub("^--file=", "", script_arg)))
 repo_dir <- dirname(script_dir)
-scenario_results_dir <- file.path(
+default_scenario_dir <- file.path(
   repo_dir, "simulation", "effect_size_0.15", "results", "test_data"
 )
 output_dir <- if (length(args) == 2L) args[2] else script_dir
 data_dir <- file.path(output_dir, "figure-data")
 figure_dir <- file.path(output_dir, "figures")
 
-pair_file <- file.path(scenario_results_dir, "power_analysis_results.tsv")
-pairs <- fread(pair_file, select = c("grna_target", "response_id", "power"))
-pair_count <- nrow(pairs)
-if (pair_count != 7364L ||
-    anyNA(pairs[, .(grna_target, response_id)]) ||
-    anyDuplicated(pairs[, .(grna_target, response_id)]) ||
-    any(!is.finite(pairs$power)) ||
-    any(pairs$power < 0 | pairs$power > 1)) {
-  stop("Expected 7,364 distinct manuscript non-null pairs with valid saved powers.")
-}
-
-combined_raw_file <- file.path(scenario_results_dir, "power_analysis_output.tsv")
-split_raw_dir <- file.path(scenario_results_dir, "power_analysis_split")
+# Resolve the run-level p-values before anything else. The pair panel and the
+# historical mean must come from the same scenario as those p-values; pinning
+# them to effect_size_0.15 only worked while that scenario's raw output was on
+# disk, and it is not. Every scenario shares the same 7,364 pairs and the same
+# pval_adj_thresh / positive_proportion, so any of them is a valid source.
+combined_raw_file <- file.path(default_scenario_dir, "power_analysis_output.tsv")
+split_raw_dir <- file.path(default_scenario_dir, "power_analysis_split")
 raw_path <- if (length(args) >= 1L) {
   args[1]
 } else if (file.exists(combined_raw_file)) {
@@ -56,6 +50,25 @@ if (dir.exists(raw_path)) {
   raw_files <- raw_path
 } else {
   stop("Run-level SCEPTRE output does not exist: ", raw_path)
+}
+scenario_results_dir <- dirname(normalizePath(raw_path))
+scenario_label <- basename(dirname(dirname(scenario_results_dir)))
+scenario_slug <- gsub("(^-|-$)", "", gsub("[^A-Za-z0-9._-]+", "-", scenario_label))
+if (!nzchar(scenario_slug)) stop("Could not derive a scenario name from: ", raw_path)
+message("Scenario: ", scenario_label)
+
+pair_file <- file.path(scenario_results_dir, "power_analysis_results.tsv")
+if (!file.exists(pair_file)) {
+  stop("No power_analysis_results.tsv beside the run-level output: ", pair_file)
+}
+pairs <- fread(pair_file, select = c("grna_target", "response_id", "power"))
+pair_count <- nrow(pairs)
+if (pair_count != 7364L ||
+    anyNA(pairs[, .(grna_target, response_id)]) ||
+    anyDuplicated(pairs[, .(grna_target, response_id)]) ||
+    any(!is.finite(pairs$power)) ||
+    any(pairs$power < 0 | pairs$power > 1)) {
+  stop("Expected 7,364 distinct manuscript non-null pairs with valid saved powers.")
 }
 
 required_columns <- c("grna_target", "response_id", "rep", "p_value")
@@ -145,8 +158,9 @@ summary <- do.call(rbind, lapply(panel_sizes, function(n) {
 historical_full_pool_mean <- mean(pairs$power)
 if (abs(summary$mean_power[nrow(summary)] - historical_full_pool_mean) > 0.02) {
   warning(sprintf(
-    "Full-pool mean %.4f differs from retained manuscript mean %.4f by more than 0.02; check that the raw file is the effect-size 0.15 scenario. Fresh Uniform null draws can cause smaller differences.",
-    summary$mean_power[nrow(summary)], historical_full_pool_mean
+    "Full-pool mean %.4f differs from the retained %s mean %.4f by more than 0.02; check that the raw file matches %s. Fresh Uniform null draws can cause smaller differences.",
+    summary$mean_power[nrow(summary)], scenario_label,
+    historical_full_pool_mean, pair_file
   ))
 }
 
@@ -156,11 +170,14 @@ write.csv(
   data.frame(selection_order = seq_len(pair_count),
              grna_target = pairs$grna_target[pair_order],
              response_id = pairs$response_id[pair_order]),
-  file.path(data_dir, "sceptre-fixed-pair-order.csv"), row.names = FALSE
+  file.path(data_dir, paste0(scenario_slug, "-fixed-pair-order.csv")),
+  row.names = FALSE
 )
-write.csv(results, file.path(data_dir, "sceptre-fixed-panel-run-power.csv"),
+write.csv(results,
+          file.path(data_dir, paste0(scenario_slug, "-fixed-panel-run-power.csv")),
           row.names = FALSE)
-write.csv(summary, file.path(data_dir, "sceptre-fixed-panel-run-summary.csv"),
+write.csv(summary,
+          file.path(data_dir, paste0(scenario_slug, "-fixed-panel-run-summary.csv")),
           row.names = FALSE)
 
 results$pair_count_label <- factor(
@@ -179,7 +196,7 @@ plot <- ggplot(results, aes(x = pair_count_label, y = power)) +
   scale_y_continuous(labels = function(y) paste0(round(100 * y), "%"),
                      breaks = seq(0, 1, by = 0.05),
                      expand = expansion(mult = c(0.04, 0.06))) +
-  labs(title = "SCEPTRE power across simulated runs",
+  labs(title = paste0("SCEPTRE power across simulated runs: ", scenario_label),
        x = "Number of non-null perturbation-gene pairs",
        y = "Non-null rejection proportion") +
   theme_classic(base_size = 12) +
@@ -194,12 +211,14 @@ plot <- ggplot(results, aes(x = pair_count_label, y = power)) +
     panel.grid.major.y = element_line(color = "#E8E8E8", linewidth = 0.3)
   )
 
-ggsave(file.path(figure_dir, "sceptre-power-across-runs-fixed-pairs.png"),
+ggsave(file.path(figure_dir,
+                 paste0(scenario_slug, "-power-across-runs-fixed-pairs.png")),
        plot, width = 10.5, height = 6.3, dpi = 300, bg = "white")
-ggsave(file.path(figure_dir, "sceptre-power-across-runs-fixed-pairs.pdf"),
+ggsave(file.path(figure_dir,
+                 paste0(scenario_slug, "-power-across-runs-fixed-pairs.pdf")),
        plot, width = 10.5, height = 6.3, bg = "white")
 
 cat(sprintf(
-  "Saved 200 run-level power values at each of %d fixed panel sizes; full-pool mean = %.4f.\n",
-  length(panel_sizes), full_pool_mean
+  "[%s] Saved 200 run-level power values at each of %d fixed panel sizes; full-pool mean = %.4f.\n",
+  scenario_label, length(panel_sizes), full_pool_mean
 ))
